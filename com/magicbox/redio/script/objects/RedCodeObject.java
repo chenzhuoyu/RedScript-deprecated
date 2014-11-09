@@ -16,12 +16,11 @@ public class RedCodeObject extends RedObject
 	public static final int CONTINUE = 2;
 
 	private BytecodeBuffer buffer = new BytecodeBuffer();
+	private Stack<RedObject> evalStack = new Stack<RedObject>();
 	private HashMap<String, RedObject> context = null;
 
-	private Stack<RedObject> stack = new Stack<RedObject>();
-	private Stack<Stack<RedObject>> nested = new Stack<Stack<RedObject>>();
-
 	private int nestingLevel = 0;
+	private boolean isRootObject = false;
 	private Interpreter interpreter = null;
 	private RedFunctionObject functionGenerating = null;
 
@@ -48,7 +47,12 @@ public class RedCodeObject extends RedObject
 
 	public Stack<RedObject> getStack()
 	{
-		return stack;
+		return evalStack;
+	}
+
+	public void setRootObject(boolean rootObject)
+	{
+		isRootObject = rootObject;
 	}
 
 	public void setInterpreter(Interpreter interpreter)
@@ -59,9 +63,9 @@ public class RedCodeObject extends RedObject
 	public void eval()
 	{
 		buffer.pushIP();
-		context = interpreter.pushContext();
+		context = interpreter.pushContext(isRootObject);
 
-		while (interpreter.isRunning())
+		while (true)
 		{
 			Bytecode bytecode = buffer.nextBytecode();
 
@@ -98,12 +102,10 @@ public class RedCodeObject extends RedObject
 				switch (evalBytecode(bytecode))
 				{
 					case HALT:
-						interpreter.halt();
-
 					case RETURN:
 					{
 						buffer.popIP();
-						interpreter.popContext();
+						context = interpreter.popContext();
 						return;
 					}
 
@@ -123,11 +125,11 @@ public class RedCodeObject extends RedObject
 				switch (bytecode.constAccum.type)
 				{
 					case Constant.STRING:
-						stack.push(new RedStringObject(bytecode.constAccum.stringValue));
+						evalStack.push(new RedStringObject(bytecode.constAccum.stringValue));
 						break;
 
 					case Constant.INTEGER:
-						stack.push(RedIntObject.fromInteger(bytecode.constAccum.intValue));
+						evalStack.push(RedIntObject.fromInteger(bytecode.constAccum.intValue));
 						break;
 
 					default:
@@ -138,55 +140,55 @@ public class RedCodeObject extends RedObject
 			}
 
 			case Bytecode.LOAD_OBJECT:
-				stack.push(lookupObject(bytecode.stringAccum));
+				evalStack.push(lookupObject(bytecode.stringAccum));
 				break;
 
 			case Bytecode.STOR_OBJECT:
-				context.put(bytecode.stringAccum, stack.pop());
+				context.put(bytecode.stringAccum, evalStack.pop());
 				break;
 
 			case Bytecode.GET_ATTR:
 			{
-				RedObject a = stack.pop();
-				stack.push(a.invokeMethod("__getattr__", new RedStringObject(bytecode.stringAccum)));
+				RedObject a = evalStack.pop();
+				evalStack.push(a.invokeMethod("__getattr__", new RedStringObject(bytecode.stringAccum)));
 				break;
 			}
 
 			case Bytecode.GET_ITEM:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__getitem__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__getitem__", a));
 				break;
 			}
 
 			case Bytecode.SET_ATTR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				RedObject c = stack.pop();
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				RedObject c = evalStack.pop();
 				c.invokeMethod("__setattr__", b, a);
 				break;
 			}
 
 			case Bytecode.SET_ITEM:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				RedObject c = stack.pop();
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				RedObject c = evalStack.pop();
 				c.invokeMethod("__setitem__", b, a);
 				break;
 			}
 
 			case Bytecode.INVOKE:
 			{
-				RedObject func = stack.pop();
+				RedObject func = evalStack.pop();
 				RedObject [] args = new RedObject [bytecode.intAccum];
 
 				for (int i = 0; i < args.length; i++)
-					args[i] = stack.pop();
+					args[i] = evalStack.pop();
 
-				stack.push(func.invoke(args));
+				evalStack.push(func.invoke(args));
 				break;
 			}
 
@@ -195,296 +197,296 @@ public class RedCodeObject extends RedObject
 
 			case Bytecode.ADD:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__add__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__add__", a));
 				break;
 			}
 
 			case Bytecode.SUB:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__sub__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__sub__", a));
 				break;
 			}
 
 			case Bytecode.MUL:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__mul__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__mul__", a));
 				break;
 			}
 
 			case Bytecode.DIV:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__div__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__div__", a));
 				break;
 			}
 
 			case Bytecode.MOD:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__mod__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__mod__", a));
 				break;
 			}
 
 			case Bytecode.POW:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__pow__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__pow__", a));
 				break;
 			}
 
 			case Bytecode.BIT_OR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bit_or__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bit_or__", a));
 				break;
 			}
 
 			case Bytecode.BIT_AND:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bit_and__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bit_and__", a));
 				break;
 			}
 
 			case Bytecode.BIT_XOR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bit_xor__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bit_xor__", a));
 				break;
 			}
 
 			case Bytecode.BIT_NOT:
 			{
-				RedObject a = stack.pop();
-				stack.push(a.invokeMethod("__bit_not__"));
+				RedObject a = evalStack.pop();
+				evalStack.push(a.invokeMethod("__bit_not__"));
 				break;
 			}
 
 			case Bytecode.LSHIFT:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__lshift__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__lshift__", a));
 				break;
 			}
 
 			case Bytecode.RSHIFT:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__rshift__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__rshift__", a));
 				break;
 			}
 
 			case Bytecode.AUG_ADD:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_add__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_add__", a));
 				break;
 			}
 
 			case Bytecode.AUG_SUB:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_sub__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_sub__", a));
 				break;
 			}
 
 			case Bytecode.AUG_MUL:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_mul__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_mul__", a));
 				break;
 			}
 
 			case Bytecode.AUG_DIV:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_div__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_div__", a));
 				break;
 			}
 
 			case Bytecode.AUG_MOD:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_mod__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_mod__", a));
 				break;
 			}
 
 			case Bytecode.AUG_POW:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_pow__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_pow__", a));
 				break;
 			}
 
 			case Bytecode.AUG_BIT_OR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_bit_or__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_bit_or__", a));
 				break;
 			}
 
 			case Bytecode.AUG_BIT_AND:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_bit_and__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_bit_and__", a));
 				break;
 			}
 
 			case Bytecode.AUG_BIT_XOR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_bit_xor__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_bit_xor__", a));
 				break;
 			}
 
 			case Bytecode.AUG_LSHIFT:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_lshift__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_lshift__", a));
 				break;
 			}
 
 			case Bytecode.AUG_RSHIFT:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__inplace_rshift__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__inplace_rshift__", a));
 				break;
 			}
 
 			case Bytecode.BOOL_OR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bool_or__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bool_or__", a));
 				break;
 			}
 
 			case Bytecode.BOOL_AND:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bool_and__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bool_and__", a));
 				break;
 			}
 
 			case Bytecode.BOOL_XOR:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__bool_xor__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__bool_xor__", a));
 				break;
 			}
 
 			case Bytecode.BOOL_NOT:
 			{
-				RedObject a = stack.pop();
-				stack.push(a.invokeMethod("__bool_not__"));
+				RedObject a = evalStack.pop();
+				evalStack.push(a.invokeMethod("__bool_not__"));
 				break;
 			}
 
 			case Bytecode.EQ:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__eq__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__eq__", a));
 				break;
 			}
 
 			case Bytecode.LE:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__le__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__le__", a));
 				break;
 			}
 
 			case Bytecode.GE:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__ge__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__ge__", a));
 				break;
 			}
 
 			case Bytecode.NEQ:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__neq__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__neq__", a));
 				break;
 			}
 
 			case Bytecode.LEQ:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__leq__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__leq__", a));
 				break;
 			}
 
 			case Bytecode.GEQ:
 			{
-				RedObject a = stack.pop();
-				RedObject b = stack.pop();
-				stack.push(b.invokeMethod("__geq__", a));
+				RedObject a = evalStack.pop();
+				RedObject b = evalStack.pop();
+				evalStack.push(b.invokeMethod("__geq__", a));
 				break;
 			}
 
 			case Bytecode.POS:
 			{
-				RedObject a = stack.pop();
-				stack.push(a.invokeMethod("__pos__"));
+				RedObject a = evalStack.pop();
+				evalStack.push(a.invokeMethod("__pos__"));
 				break;
 			}
 
 			case Bytecode.NEG:
 			{
-				RedObject a = stack.pop();
-				stack.push(a.invokeMethod("__neg__"));
+				RedObject a = evalStack.pop();
+				evalStack.push(a.invokeMethod("__neg__"));
 				break;
 			}
 
 			case Bytecode.DUP:
-				stack.push(stack.elementAt(stack.size() - 1));
+				evalStack.push(evalStack.elementAt(evalStack.size() - 1));
 				break;
 
 			case Bytecode.DUP2:
 			{
-				RedObject top = stack.elementAt(stack.size() - 1);
-				RedObject second = stack.elementAt(stack.size() - 2);
+				RedObject top = evalStack.elementAt(evalStack.size() - 1);
+				RedObject second = evalStack.elementAt(evalStack.size() - 2);
 
-				stack.push(second);
-				stack.push(top);
+				evalStack.push(second);
+				evalStack.push(top);
 				break;
 			}
 
 			case Bytecode.DROP:
-				stack.pop();
+				evalStack.pop();
 				break;
 
 			case Bytecode.START_FUNC:
@@ -501,14 +503,14 @@ public class RedCodeObject extends RedObject
 
 			case Bytecode.BRTRUE:
 			{
-				if (stack.pop().isTrue())
+				if (evalStack.pop().isTrue())
 					buffer.branchTo(bytecode.intAccum);
 				break;
 			}
 
 			case Bytecode.BRFALSE:
 			{
-				if (!stack.pop().isTrue())
+				if (!evalStack.pop().isTrue())
 					buffer.branchTo(bytecode.intAccum);
 				break;
 			}

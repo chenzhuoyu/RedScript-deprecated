@@ -22,8 +22,18 @@ public class RedScriptMain
 
 	public void run() throws ScriptException
 	{
+		// @formatter:off
 		String src =
-			"func partition(a, l, r)\n{\n	i = l;\n	j = r;\n	pv = a[i];\n\n	while (i < j)\n	{\n		while (i < j and a[j] >= pv) j -= 1;\n\n		if (i < j)\n		{\n			a[i] = a[j];\n			i += 1;\n		}\n\n		while (i < j and a[i] < pv) i += 1;\n\n		if (i < j)\n		{\n			a[j] = a[i];\n			j -= 1;\n		}\n	}\n\n	a[i] = pv;\n	return i;\n}\n\nfunc quickSort(a, l, r)\n{\n	if (r > l)\n	{\n		pv = partition(a, l, r);\n		quickSort(a, l, pv - 1);\n		quickSort(a, pv + 1, r);\n	}\n}\n\ndata = array(312, 2, 123, 5, 12, 776);\nquickSort(data, 0, data.length - 1);\nConsole.print(data);\nConsole.print('done');";
+			"func fac(n)" +
+			"{" +
+			"	if (n <= 1)" +
+			"		return 1;" +
+			"	else" +
+			"		return n * fac(n - 1);" +
+			"}" +
+			"" +
+			"Console.println('test:', fac(10));";
+		// @formatter:on
 
 		interpreter.addBuiltins("Console", new RedConsoleObject());
 		interpreter.addBuiltins("int", new RedIntObjectConstructor());
@@ -31,7 +41,6 @@ public class RedScriptMain
 		interpreter.addBuiltins("array", new RedArrayObjectConstructor());
 		interpreter.addBuiltins("object", new RedObjectConstructor());
 		interpreter.addBuiltins("string", new RedStringObjectConstructor());
-
 		interpreter.setBytecodes(Compiler.compile("<string>", src));
 		interpreter.run();
 	}

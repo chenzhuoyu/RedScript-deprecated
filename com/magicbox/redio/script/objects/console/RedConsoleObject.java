@@ -7,5 +7,6 @@ public class RedConsoleObject extends RedObject
 	public RedConsoleObject()
 	{
 		setAttribute("print", new RedConsolePrintMethod());
+		setAttribute("println", new RedConsolePrintLnMethod());
 	}
 }

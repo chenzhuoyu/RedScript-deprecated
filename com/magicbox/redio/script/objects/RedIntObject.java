@@ -78,7 +78,7 @@ public class RedIntObject extends RedObject
 	public RedObject __mul__(RedObject other)
 	{
 		int otherValue = convert(other);
-		return RedIntObject.fromInteger(value - otherValue);
+		return RedIntObject.fromInteger(value * otherValue);
 	}
 
 	public RedObject __div__(RedObject other)

@@ -23,7 +23,7 @@ public class RedObject
 	@Override
 	public String toString()
 	{
-		return "<type '" + getClass().getName() + "'>";
+		return "<type '" + getClass().getSimpleName() + "'>";
 	}
 
 	// Object protocol
